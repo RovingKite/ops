@@ -132,10 +132,33 @@ func runCommandHandler(cmd *cobra.Command, args []string) {
 	hypervisor.Start(&c.RunConfig)
 }
 
+func updateNightly() bool {
+	local := path.Join(GetOpsHome(), "timestamp")
+	var localStamp []byte
+	if localStamp, err := ioutil.ReadFile(local); os.IsNotExist(err) {
+		return true
+	}
+	remote := fmt.Sprintf(NightlyReleaseBaseUrl, "timestamp")
+
+	resp, err := http.Get(remote)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	remoteStamp, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	return string(remoteStamp) == string(localStamp)
+}
+
 func buildImages(c *api.Config) {
 	var err error
-	if c.NightlyBuild {
-		err = api.DownloadImages(api.DevBaseUrl, c.Force)
+	if c.NightlyBuild { 
+		// Honor force, but if 
+		// there is a new nightly update anyways.
+		c.Force ||= updateNightly()
+		err = api.DownloadImages(api.NightlyReleaseBaseUrl, c.Force)
 	} else {
 		err = api.DownloadImages(api.ReleaseBaseUrl, c.Force)
 	}
